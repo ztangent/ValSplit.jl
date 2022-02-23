@@ -1,0 +1,204 @@
+module ValSplit
+
+using ExprTools, Tricks
+
+export @valsplit, valarg_params, valarg_has_param
+
+include("utils.jl")
+
+"""
+    valarg_params(f, types::Type{<:Tuple}, idx::Int, ptype::Type=Any)
+
+Given a method signature `(f, types)`, finds all matching methods with a
+concrete `Val`-typed argument in position `idx`, then returns all parameter
+values for the `Val`-typed argument as a tuple. Optionally, `ptype` can be
+specified to filter parameter values that are instances of `ptype`.
+
+This function is statically compiled, and will automatically be recompiled
+whenever a new method of `f` is defined.
+"""
+@generated function valarg_params(
+    @nospecialize(f) , @nospecialize(types::Type{T}),
+    @nospecialize(idx::Val{N}), @nospecialize(ptype::Type{P}=Any)
+) where {T <: Tuple, N, P}
+    # Extract parameters of Val-typed argument from matching methods
+    vparams = []
+    for m in Tricks._methods(f, T)
+        argtypes = fieldtypes(m.sig)[2:end]
+        N <= length(argtypes) || continue
+        ty = argtypes[N]
+        ty <: Val && isconcretetype(ty) || continue
+        param = val_param(ty)
+        param isa P || continue
+        push!(vparams, param)
+    end
+    vparams = Tuple(vparams)
+    ci = Tricks.create_codeinfo_with_returnvalue(
+        [Symbol("#self#"), :f, :types, :idx, :ptype],
+        [:T, :N, :P], (:T, :N, :P), :($vparams))
+    # Now we add the edges so if a method is defined this recompiles
+    ci.edges = Tricks._method_table_all_edges_all_methods(f, T)
+    return ci
+end
+valarg_params(f, types::Type{<:Tuple}, idx::Int, ptype::Type=Any) =
+    valarg_params(f, types, Val(idx), ptype)
+valarg_params(f, idx::Val{N}, ptype::Type=Any) where {N} =
+    valarg_params(f, Tuple{Vararg{Any}}, idx, ptype)
+valarg_params(f, idx::Int, ptype::Type=Any) =
+    valarg_params(f, Tuple{Vararg{Any}}, Val(idx), ptype)
+
+"""
+    valarg_has_param(f, types::Type{<:Tuple}, param, idx::Int, ptype::Type=Any)
+
+Given a method signature `(f, types)`, returns `true` if there exists a
+matching method with a `Val`-typed argument in position `idx` with parameter
+`param` and parameter type `ptype`.
+"""
+function valarg_has_param(f, types, param::P, idx, ptype::Type{P}=Any) where {P}
+    return param in valarg_params(f, types, idx, ptype)
+end
+
+"""
+    _valswitch(::Val{Vs}, ::Val{I}, f, default_f, args...) where {Vs, I}
+
+Generates a switch statement with `args[N] == v` where `v` ∈ `Vs` as the
+branch conditions. Each branch with value `v` calls `f(args...)`, with
+`args[idx]` replaced by `Val(v)`. If all branch conditions fail, `default_f`
+is called with with no arguments.
+"""
+@generated function _valswitch(
+    vals::Val{Vs}, idx::Val{I}, f, default_f, args::Vararg{Any,N}
+) where {Vs, I, N}
+    vals = map(QuoteNode, Vs)
+    cond_exprs = [Expr(:call, :(==), :(args[$I]), v) for v in vals]
+    branch_exprs = map(vals) do v
+        args = [i == I ? :(Val($v)) : :(args[$i]) for i in 1:N]
+        return Expr(:call, :f, args...)
+    end
+    default_expr = :(default_f())
+    return generate_switch_stmt(cond_exprs, branch_exprs, default_expr)
+end
+
+"""
+    _valsplit(expr, idx::Int, val_idxs=[idx])
+
+Generates function expression(s) returned by `@valsplit` macro. `idx` is the
+index of the argument to split on. `val_idxs` are the indices of all arguments
+that are `Val`-typed, defining the set of matching methods to switch over.
+"""
+function _valsplit(def::Dict{Symbol}, idx::Int, val_idxs=[idx])
+    @assert(haskey(def, :name), # TODO: Remove this restriction
+            "Function cannot be anonymous")
+    @assert(haskey(def, :args) && length(def[:args]) >= idx,
+            "Function has less than $idx arguments")
+    # Extract function name, signature, and argument expressions
+    fname = def[:name]
+    # TODO: Handle closures
+    types = args_tupletype_expr(def[:args], esc)
+    argnames = collect(Symbol, args_tuple_expr(def[:args]).args)
+    # Extract type of argument to split on
+    ptype = types.args[idx + 1]
+    types.args[val_idxs .+ 1] .= :Val
+    # TODO: Check that ptype is not Vararg
+    # Escape function name and arguments
+    def[:name] = esc(fname)
+    def[:args] = map(esc, def[:args])
+    if haskey(def, :whereparams)
+        def[:whereparams] = map(esc, def[:whereparams])
+    end
+    # Generate the function body
+    def[:body] = quote
+        # Look up the parameters for the Val-typed argument in position idx
+        vals = valarg_params($(esc(fname)), $types, $idx, $ptype)
+        # Default function returns the original function body
+        function default_f() $(esc(def[:body])) end
+        # Generate a switch expression over the Val-type parameters
+        return _valswitch(Val(vals), Val($idx), $(esc(fname)), default_f,
+                          $(map(esc, argnames)...))
+    end
+    return combinedef(def)
+end
+_valsplit(expr::Expr, idx::Int, val_idxs=[idx]) =
+    _valsplit(splitdef(expr), idx, val_idxs)
+
+"""
+    @valsplit f
+    @valsplit idx::Int f
+
+Given a function definition `f`, the `@valsplit` macro compiles away dynamic
+dispatch over methods of `f` with `Val`-typed arguments at the specified
+indices (i.e., it "splits" on `Val`-typed arguments, similar to union
+splitting). The resulting method is automatically recompiled whenever a new
+method of `f` is defined.
+
+Using the first form of `@valsplit`, each argument `x::T` to split on
+should be annotated as `Val(x::T)`. Alternatively, an argument index `idx` can
+be manually specified using the second form of the macro.
+
+# Example
+
+Suppose we have a function `soundof` that returns how an animal sounds:
+
+```julia
+soundof(animal::Val{:dog}) = "woof"
+soundof(animal::Val{:cat}) = "nyan"
+```
+
+Using `@valsplit`, we can define a new method for `soundof` that accepts a
+`Symbol` argument, and branches to each instance of `soundof(::Val{T})`
+(where `T` is a `Symbol`) defaulting to the function body otherwise:
+
+```julia
+@valsplit function soundof(Val(animal::Symbol))
+    error("Sound not defined for animal: \$animal")
+end
+```
+
+The resulting method is equivalent in behavior to the following:
+```julia
+function soundof(animal::Symbol)
+    if animal == :dog
+        return soundof(Val{:dog}())
+    elseif animal == :cat
+        return soundof(Val{:cat}())
+    else
+        error("Sound not defined for animal: \$animal")
+    end
+end
+```
+"""
+macro valsplit(expr)
+    def = splitdef(expr)
+    # Find arguments to split by value (notated by Val(arg::T))
+    split_idxs = Int[]
+    unwrapped_args = []
+    for (i, arg) in enumerate(get(def, :args, []))
+        if Meta.isexpr(arg, :call, 2) && arg.args[1] == :Val
+            push!(split_idxs, i)
+            push!(unwrapped_args, arg.args[2])
+        else
+            push!(unwrapped_args, arg)
+        end
+    end
+    argnames = collect(Symbol, args_tuple_expr(unwrapped_args).args)
+    # Generate function definition for each argument to split on
+    i_def = copy(def)
+    i_def[:args] = unwrapped_args
+    f_exprs = Expr[]
+    while !isempty(split_idxs)
+        idx = first(split_idxs)
+        push!(f_exprs, _valsplit(copy(i_def), idx, split_idxs))
+        popfirst!(split_idxs)
+        # Adjust function signature for next definition
+        V_typevar = gensym(:V)
+        i_def[:args][idx] = Expr(:(::), argnames[idx], V_typevar)
+        push!(get!(i_def, :whereparams, []), :($V_typevar <: $(QuoteNode(Val))))
+    end
+    return Expr(:block, f_exprs...)
+end
+
+macro valsplit(idx::Int, expr)
+    return _valsplit(expr, idx)
+end
+
+end
