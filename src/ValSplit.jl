@@ -87,21 +87,24 @@ index of the argument to split on. `val_idxs` are the indices of all arguments
 that are `Val`-typed, defining the set of matching methods to switch over.
 """
 function _valsplit(def::Dict{Symbol}, idx::Int, val_idxs=[idx])
-    @assert(haskey(def, :name), # TODO: Remove this restriction
-            "Function cannot be anonymous")
-    @assert(haskey(def, :args) && length(def[:args]) >= idx,
-            "Function has less than $idx arguments")
+    if !haskey(def, :args) || length(def[:args]) < idx
+        error("Function has less than $idx arguments")
+    end
+    # Fill-in unnamed functions and arguments
+    def[:name] = fill_unnamed(get(gensym, def, :name))
+    def[:args] = map(fill_unnamed, def[:args])
     # Extract function name, signature, and argument expressions
-    fname = def[:name]
-    # TODO: Handle closures
+    fname = rm_type_annotation(def[:name])
     types = args_tupletype_expr(def[:args], esc)
-    argnames = collect(Symbol, args_tuple_expr(def[:args]).args)
+    argnames = collect(args_tuple_expr(def[:args]).args)
     # Extract type of argument to split on
     ptype = types.args[idx + 1]
     types.args[val_idxs .+ 1] .= :Val
-    # TODO: Check that ptype is not Vararg
+    if is_vararg_expr(ptype)
+        error("Cannot split Vararg arguments.")
+    end
     # Escape function name and arguments
-    def[:name] = esc(fname)
+    def[:name] = esc(def[:name])
     def[:args] = map(esc, def[:args])
     if haskey(def, :whereparams)
         def[:whereparams] = map(esc, def[:whereparams])
@@ -116,6 +119,7 @@ function _valsplit(def::Dict{Symbol}, idx::Int, val_idxs=[idx])
         return _valswitch(Val(vals), Val($idx), $(esc(fname)), default_f,
                           $(map(esc, argnames)...))
     end
+    # Return recombined function expression
     return combinedef(def)
 end
 _valsplit(expr::Expr, idx::Int, val_idxs=[idx]) =
@@ -169,6 +173,9 @@ end
 """
 macro valsplit(expr)
     def = splitdef(expr)
+    # Fill-in unnamed functions and arguments
+    def[:name] = fill_unnamed(get(gensym, def, :name))
+    def[:args] = map(fill_unnamed, def[:args])
     # Find arguments to split by value (notated by Val(arg::T))
     split_idxs = Int[]
     unwrapped_args = []
@@ -180,7 +187,7 @@ macro valsplit(expr)
             push!(unwrapped_args, arg)
         end
     end
-    argnames = collect(Symbol, args_tuple_expr(unwrapped_args).args)
+    argnames = collect(args_tuple_expr(unwrapped_args).args)
     # Generate function definition for each argument to split on
     i_def = copy(def)
     i_def[:args] = unwrapped_args

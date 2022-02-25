@@ -38,6 +38,18 @@ end
 args_tupletype_expr(signature_def::Dict{Symbol}, esc=identity) =
     args_tupletype_expr(signature_def[:args], esc)
 
+"Check whether an expression is a Vararg (including escaped Varargs)."
+is_vararg_expr(e) = Meta.isexpr(e, [:where, :curly, :escape]) ?
+    is_vararg_expr(e.args[1]) : (e == :Vararg)
+
+"Fill-in unnamed arguments."
+fill_unnamed(e) =
+    Meta.isexpr(e, [:(::)], 1) ? Expr(:(::), gensym(), e.args[2]) : e
+
+"Remove type annotation from expression, if present."
+rm_type_annotation(e) =
+    Meta.isexpr(e, [:(::)], 2) ? e.args[1] : e
+
 """
     generate_switch_stmt(cond_exprs, branch_exprs, default_expr=:nothing)
 

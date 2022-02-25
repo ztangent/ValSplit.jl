@@ -81,6 +81,31 @@ spelling(::Val{ℯ}) = "euler's number"
 @test spelling(π) == "pi"
 @test spelling(ℯ) == "euler's number"
 
+# Test that we can't split Vararg arguments
+@test_throws LoadError @macroexpand @valsplit function spelling(Val(n::Real...))
+    string(n)
+end
+
+## Test closures
+
+struct Exponentiator{T <: Real}
+    base::T
+end
+
+(ex::Exponentiator)(exponent::Val{1}) = ex.base
+(ex::Exponentiator)(exponent::Val{2}) = ex.base * ex.base
+
+@valsplit (ex::Exponentiator)(Val(exponent::Int)) =
+    error("Unsupported exponent: $exponent")
+
+@test Exponentiator(3)(1) == 3
+@test Exponentiator(3)(2) == 9
+@test_throws ErrorException Exponentiator(3)(3) == 27
+
+(ex::Exponentiator)(exponent::Val{3}) = ex.base * ex.base * ex.base
+
+@test Exponentiator(3)(3) == 27
+
 ## Test that we can extend functions defined in another module
 
 module Animals
