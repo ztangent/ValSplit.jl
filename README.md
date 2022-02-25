@@ -1,6 +1,6 @@
 # ValSplit.jl
 
-Compile away dynamic dispatch over methods with `Val`-typed arguments by "`Val`-splitting" (similar to [union splitting](https://julialang.org/blog/2018/08/union-splitting/)) using the `@valsplit` macro. By annotating a function definition with `@valsplit` and choosing arguments to split upon, the resulting function will be a switch statement over all `Val` parameters associated with the chosen arguments.
+Compile away dynamic dispatch over methods with `Val`-typed arguments by "`Val`-splitting" (similar to [union splitting](https://julialang.org/blog/2018/08/union-splitting/)) using the `@valsplit` macro. By annotating a function definition with `@valsplit` and choosing arguments to split upon, the resulting function will be a switch statement over all `Val` parameters associated with the chosen arguments. Requires Julia 1.3 and above.
 
 ## Example
 
