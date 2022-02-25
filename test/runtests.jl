@@ -136,5 +136,5 @@ Animals.soundof(animal::Val{:human}) = "meh"
     Set((:korean, :hindi, :english))
 
 # Test valarg_has_param
-valarg_has_param(spelling, Tuple{Any}, π, 1, Irrational)
-valarg_has_param(soundof, Tuple{Val{:cat}, Any}, :japanese, 2)
+valarg_has_param(π, spelling, 1, Irrational)
+valarg_has_param(:japanese, soundof, Tuple{Val{:cat}, Any}, 2)
