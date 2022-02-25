@@ -8,12 +8,19 @@ include("utils.jl")
 
 """
     valarg_params(f, types::Type{<:Tuple}, idx::Int, ptype::Type=Any)
-    valarg_params(f, idx::Int, ptype::Type=Any)
+    valarg_params(f, idx::Int, ptypes::Type=Any)
 
 Given a method signature `(f, types=Tuple{Vararg{Any}})`, finds all matching
 methods with a concrete `Val`-typed argument in position `idx`, then returns
 all parameter values for the `Val`-typed argument as a tuple. Optionally,
 `ptype` can be specified to filter parameters that are instances of `ptype`.
+
+    valarg_params(f, types::Type{<:Tuple}, idxs::Tuple, ptypes::Type)
+    valarg_params(f, idxs::Tuple, ptypes::Type)
+
+To find parameter values for multiple argument indices, `idxs` can also be
+specified as a `Tuple`. To filter each argument separately, `ptypes` should be
+specified as a `Tuple` type.
 
 This function is statically compiled, and will automatically be recompiled
 whenever a new method of `f` is defined.
@@ -22,31 +29,39 @@ whenever a new method of `f` is defined.
     @nospecialize(f) , @nospecialize(types::Type{T}),
     @nospecialize(idx::Val{N}), @nospecialize(ptype::Type{P}=Any)
 ) where {T <: Tuple, N, P}
+    # Check if N and P are single values or tuples
+    multi_idx = N isa Tuple
+    if multi_idx
+        idxs = collect(Int, N)
+        P = P <: Tuple ? P : Tuple{fill(P, length(idxs))...}
+    else
+        idxs = [N]
+    end
     # Extract parameters of Val-typed argument from matching methods
     vparams = Vector{P}()
     for m in Tricks._methods(f, T)
         argtypes = fieldtypes(m.sig)[2:end]
-        N <= length(argtypes) || continue
-        ty = argtypes[N]
-        ty <: Val && isconcretetype(ty) || continue
-        param = val_param(ty)
-        param isa P || continue
-        push!(vparams, param)
+        all(idxs .<= length(argtypes)) || continue
+        types = argtypes[idxs]
+        all(ty <: Val && isconcretetype(ty) for ty in types) || continue
+        ps = multi_idx ? Tuple(val_param.(types)) : val_param(types[1])
+        ps isa P || continue
+        push!(vparams, ps)
     end
     unique!(vparams)
     vparams = Tuple(vparams)
+    # Create CodeInfo and add edges so if a method is defined this recompiles
     ci = Tricks.create_codeinfo_with_returnvalue(
         [Symbol("#self#"), :f, :types, :idx, :ptype],
         [:T, :N, :P], (:T, :N, :P), :($vparams))
-    # Now we add the edges so if a method is defined this recompiles
     ci.edges = Tricks._method_table_all_edges_all_methods(f, T)
     return ci
 end
-valarg_params(f, types::Type{<:Tuple}, idx::Int, ptype::Type=Any) =
+valarg_params(f, types::Type{<:Tuple}, idx::Union{Int,Tuple}, ptype::Type=Any) =
     valarg_params(f, types, Val(idx), ptype)
 valarg_params(f, idx::Val{N}, ptype::Type=Any) where {N} =
     valarg_params(f, Tuple{Vararg{Any}}, idx, ptype)
-valarg_params(f, idx::Int, ptype::Type=Any) =
+valarg_params(f, idx::Union{Int,Tuple}, ptype::Type=Any) =
     valarg_params(f, Tuple{Vararg{Any}}, Val(idx), ptype)
 
 """
@@ -56,6 +71,13 @@ valarg_params(f, idx::Int, ptype::Type=Any) =
 Given a method signature `(f, types)`, returns `true` if there exists a
 matching method with a `Val`-typed argument in position `idx` with parameter
 `param` and parameter type `ptype`.
+
+    valarg_has_param(params, f, types::Type{<:Tuple}, idxs::Tuple, ptypes::Type)
+    valarg_has_param(params, f, idxs::Tuple, ptypes::Type)
+
+To check parameter values for multiple argument indices, `idxs` can also be
+specified as a `Tuple`. To filter each argument separately, `ptypes` should be
+specified as a `Tuple` type.
 """
 valarg_has_param(param::P, f, types::Type{<:Tuple}, idx, ptype::Type{P}=Any) where {P} =
     param in valarg_params(f, types, idx, ptype)

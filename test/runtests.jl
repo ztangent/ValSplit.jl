@@ -134,7 +134,12 @@ Animals.soundof(animal::Val{:human}) = "meh"
     Set((:dog, :cat, :human))
 @test Set(valarg_params(soundof, Tuple{Val{:frog}, Any}, 2, Symbol)) ==
     Set((:korean, :hindi, :english))
+@test Set(valarg_params(soundof, Tuple{Any, Val{:english}}, (1,2), Symbol)) ==
+    Set(((:frog, :english), (:cat, :english), (:dog, :english)))
+@test Set(valarg_params(soundof, Tuple{Any}, (1,), Tuple{Symbol})) ==
+    Set(((:dog,), (:cat,), (:human,)))
 
 # Test valarg_has_param
-valarg_has_param(π, spelling, 1, Irrational)
-valarg_has_param(:japanese, soundof, Tuple{Val{:cat}, Any}, 2)
+@test valarg_has_param(π, spelling, 1, Irrational)
+@test valarg_has_param(:japanese, soundof, Tuple{Val{:cat}, Any}, 2)
+@test valarg_has_param((:frog, :english), soundof, Tuple{Any, Any}, (1, 2))
