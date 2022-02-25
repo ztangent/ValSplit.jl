@@ -165,6 +165,10 @@ Using the first form of `@valsplit`, each argument `x::T` to split on
 should be annotated as `Val(x::T)`. Alternatively, an argument index `idx` can
 be manually specified using the second form of the macro.
 
+!!! note "Documentation Issues"
+    Documenting a `@valsplit`-annotated function that splits on multiple
+    arguments will lead to errors. Consider documenting the function separately.
+
 # Example
 
 Suppose we have a function `soundof` that returns how an animal sounds:
