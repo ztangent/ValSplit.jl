@@ -67,7 +67,47 @@ The `@valsplit` macro is intended to address the following two issues:
 - Dynamic dispatch over `Val`-typed arguments is slow
 - Alternative solutions such as manually-written switch statements and global dictionaries are often insufficient for the purposes of extensibility.
 
-Manually switching on a set of values is the fastest in terms of both compile-time and run-time, but the set of values to switch upon cannot be extended. Global dictionaries can partially address this problem by associating values with code:
+Note that dynamic dispatch does not always occur: When there are a small number of values to split on (less than 4, as of Julia 1.6), the Julia compiler automatically generates a switch statement:
+
+```julia
+soundof(animal::Val{:dog}) = "woof"
+soundof(animal::Val{:cat}) = "nyan"
+soundof(animal::Symbol) = soundof(Val(animal))
+
+julia> @code_typed soundof(:cat)
+CodeInfo(
+1 ─ %1  = invoke Main.Val(_2::Symbol)::Val{_A} where _A
+│   %2  = (isa)(%1, Val{:cat})::Bool
+└──       goto #3 if not %2
+2 ─       goto #6
+3 ─ %5  = (isa)(%1, Val{:dog})::Bool
+└──       goto #5 if not %5
+4 ─       goto #6
+5 ─ %8  = Main.soundof(%1)::String
+└──       goto #6
+6 ┄ %10 = φ (#2 => "nyan", #4 => "woof", #5 => %8)::String
+└──       return %10
+) => String
+```
+
+However, once more methods are defined, the Julia compiler no longer performs this optimization:
+
+```julia
+for i in 1:4
+    sound = "sound $i"
+    eval(:(soundof(animal::Val{Symbol(:animal, $i)}) = $sound))
+end
+soundof(animal::Symbol) = soundof(Val(animal))
+
+julia> @code_typed soundof(:animal1)
+CodeInfo(
+1 ─ %1 = invoke Main.Val(_2::Symbol)::Val{_A} where _A
+│   %2 = Main.soundof(%1)::Any
+└──      return %2
+) => Any
+```
+
+To avoid dynamic dispatch, manually switching on a set of values is the fastest in terms of both compile-time and run-time, but the set of values to switch upon cannot be extended. Global dictionaries can partially address this problem by associating values with code:
 
 ```julia
 const SOUND_OF = Dict{Symbol,Function}()
