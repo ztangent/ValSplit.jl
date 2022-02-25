@@ -126,3 +126,15 @@ using .Animals
 Animals.soundof(animal::Val{:human}) = "meh"
 
 @test Animals.soundof(:human) == "meh"
+
+## Test utilities
+
+# Test valarg_params
+@test Set(valarg_params(soundof, Tuple{Any}, 1, Symbol)) ==
+    Set((:dog, :cat, :human))
+@test Set(valarg_params(soundof, Tuple{Val{:frog}, Any}, 2, Symbol)) ==
+    Set((:korean, :hindi, :english))
+
+# Test valarg_has_param
+valarg_has_param(spelling, Tuple{Any}, π, 1, Irrational)
+valarg_has_param(soundof, Tuple{Val{:cat}, Any}, :japanese, 2)
