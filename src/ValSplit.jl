@@ -22,7 +22,7 @@ whenever a new method of `f` is defined.
     @nospecialize(idx::Val{N}), @nospecialize(ptype::Type{P}=Any)
 ) where {T <: Tuple, N, P}
     # Extract parameters of Val-typed argument from matching methods
-    vparams = []
+    vparams = Vector{P}()
     for m in Tricks._methods(f, T)
         argtypes = fieldtypes(m.sig)[2:end]
         N <= length(argtypes) || continue
@@ -32,6 +32,7 @@ whenever a new method of `f` is defined.
         param isa P || continue
         push!(vparams, param)
     end
+    unique!(vparams)
     vparams = Tuple(vparams)
     ci = Tricks.create_codeinfo_with_returnvalue(
         [Symbol("#self#"), :f, :types, :idx, :ptype],
