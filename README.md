@@ -83,7 +83,7 @@ To determine whether a particular argument of a particular function has a specif
 
 The `@valsplit` macro is intended to address the following two issues:
 - Dynamic dispatch over `Val`-typed arguments is slow
-- Alternative solutions such as manually-written switch statements and global dictionaries are often insufficient for the purposes of extensibility,.
+- Alternative solutions such as manually-written switch statements and global dictionaries are often insufficient for the purposes of extensibility.
 
 Manually switching on a set of values is the fastest in terms of both compile-time and run-time, but the set of values to switch upon cannot be extended. Global dictionaries can partially address this problem by associating values with code:
 
