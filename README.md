@@ -125,6 +125,21 @@ However, dictionary lookup times [are usually slower](https://groups.google.com/
 
 The `@valsplit` macro addresses this problem because new methods can always be introduced by downstream modules, resulting in recompilation of the `@valsplit` annotated function. It effectively uses Julia's method table as a global dictionary, but avoids the overhead of dynamic dispatch using the same `@generated` function tricks used to implement `static_hasmethod` in [`Tricks.jl`](https://github.com/oxinabox/Tricks.jl).
 
+A small benchmark is [provided here](benchmarks/benchmarks.jl). With 10 values to branch on, running Julia 1.6.1 on a Windows machine (Intel Core i7-8665U CPU @ 2.11 GHz, 16.0 GB RAM, 64-bit Windows 10 Pro), the results of the benchmark are as follows:
+
+```julia
+Manual switch statement:
+  3.275 μs (0 allocations: 0 bytes)
+Global Dict{Symbol,String}:
+  78.800 μs (0 allocations: 0 bytes)
+Global LittleDict{Symbol,String}:
+  111.600 μs (0 allocations: 0 bytes)
+Dynamic dispatch:
+  2.300 ms (0 allocations: 0 bytes)
+Val-splitting with @valsplit:
+  3.275 μs (0 allocations: 0 bytes
+```
+
 ## Utilities
 
 ValSplit.jl provides a few other utility functions for determining whether a method with particular `Val`-typed argument exists.
