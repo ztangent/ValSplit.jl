@@ -61,24 +61,6 @@ end
 
 As such, `@valsplit`-annotated functions preserve extensibility, while achieving the run-time performance of switch statements (or better, if constant propagation results in compile-time pruning of branches).
 
-## Utilities
-
-ValSplit.jl provides a few other utility functions for determining whether a method with particular `Val`-typed argument exists.
-
-To determine the set of all `Val` parameters associated with a particular argument of a particular function, use `valarg_params`:
-
->    `valarg_params(f, types::Type{<:Tuple}, idx::Int, ptype::Type=Any)`
->
-> Given a method signature `(f, types)`, finds all matching methods with a concrete `Val`-typed argument in position `idx`, then returns all parameter values for the `Val`-typed argument as a tuple. Optionally, `ptype` can be specified to filter parameter values that are instances of `ptype`.
->
->This function is statically compiled, and will automatically be recompiled whenever a new method of `f` is defined.
-
-To determine whether a particular argument of a particular function has a specific `Val` parameter, use `valarg_has_param`:
-
->    `valarg_has_param(f, types::Type{<:Tuple}, param, idx::Int, ptype::Type=Any)`
->
-> Given a method signature `(f, types)`, returns `true` if there exists a matching method with a `Val`-typed argument in position `idx` with parameter `param` and parameter type `ptype`.
-
 ## Motivation
 
 The `@valsplit` macro is intended to address the following two issues:
@@ -102,3 +84,21 @@ soundof(animal::Symbol) = SOUND_OF[animal]()
 However, dictionary lookup times [are usually slower](https://groups.google.com/g/julia-users/c/jUMu9A3QKQQ/m/qjgVWr7vAwAJ) compared to (small) switch statements. In addition, this approach [runs into issues with precompilation](https://docs.julialang.org/en/v1/manual/modules/#Module-initialization-and-precompilation), preventing a downstream module from adding new entries to a global dictionary defined in another module (except at run-time using the `__init__` function). In other words, global dictionaries are not extensible across module boundaries.
 
 The `@valsplit` macro addresses this problem because new methods can always be introduced by downstream modules, resulting in recompilation of the `@valsplit` annotated function. It effectively uses Julia's method table as a global dictionary, but avoids the overhead of dynamic dispatch using the same `@generated` function tricks used to implement `static_hasmethod` in [`Tricks.jl`](https://github.com/oxinabox/Tricks.jl).
+
+## Utilities
+
+ValSplit.jl provides a few other utility functions for determining whether a method with particular `Val`-typed argument exists.
+
+To determine the set of all `Val` parameters associated with a particular argument of a particular function, use `valarg_params`:
+
+>    `valarg_params(f, types::Type{<:Tuple}, idx::Int, ptype::Type=Any)`
+>
+> Given a method signature `(f, types)`, finds all matching methods with a concrete `Val`-typed argument in position `idx`, then returns all parameter values for the `Val`-typed argument as a tuple. Optionally, `ptype` can be specified to filter parameter values that are instances of `ptype`.
+>
+>This function is statically compiled, and will automatically be recompiled whenever a new method of `f` is defined.
+
+To determine whether a particular argument of a particular function has a specific `Val` parameter, use `valarg_has_param`:
+
+>    `valarg_has_param(f, types::Type{<:Tuple}, param, idx::Int, ptype::Type=Any)`
+>
+> Given a method signature `(f, types)`, returns `true` if there exists a matching method with a `Val`-typed argument in position `idx` with parameter `param` and parameter type `ptype`.
