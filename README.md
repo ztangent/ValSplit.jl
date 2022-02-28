@@ -1,6 +1,17 @@
 # ValSplit.jl
 
+![GitHub Workflow Status](https://img.shields.io/github/workflow/status/ztangent/ValSplit.jl/CI)
+![GitHub release (latest SemVer)](https://img.shields.io/github/v/release/ztangent/ValSplit.jl)
+![GitHub](https://img.shields.io/github/license/ztangent/ValSplit.jl?color=lightgrey)
+
 Compile away dynamic dispatch over methods with `Val`-typed arguments by "`Val`-splitting" (similar to [union splitting](https://julialang.org/blog/2018/08/union-splitting/)) using the `@valsplit` macro. By annotating a function definition with `@valsplit` and choosing arguments to split upon, the resulting function will be a switch statement over all `Val` parameters associated with the chosen arguments. Requires Julia 1.3 and above.
+
+## Installation
+
+ValSplit.jl is a registered package. To install, press `]` at the Julia REPL to enter `Pkg` mode, then run:
+```
+add ValSplit
+```
 
 ## Example
 
