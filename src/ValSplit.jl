@@ -25,37 +25,79 @@ specified as a `Tuple` type.
 This function is statically compiled, and will automatically be recompiled
 whenever a new method of `f` is defined.
 """
-@generated function valarg_params(
-    @nospecialize(f) , @nospecialize(types::Type{T}),
-    @nospecialize(idx::Val{N}), @nospecialize(ptype::Type{P}=Any)
-) where {T <: Tuple, N, P}
-    # Check if N and P are single values or tuples
-    multi_idx = N isa Tuple
-    if multi_idx
-        idxs = collect(Int, N)
-        P = P <: Tuple ? P : Tuple{fill(P, length(idxs))...}
-    else
-        idxs = [N]
+valarg_params
+
+if VERSION >= v"1.10.0-DEV.609"
+    function _valarg_params(world, source, T, N, P, self, f, types, idx, ptype)
+        @nospecialize
+        # Check if N and P are single values or tuples
+        multi_idx = N isa Tuple
+        if multi_idx
+            idxs = collect(Int, N)
+            P = P <: Tuple ? P : Tuple{fill(P, length(idxs))...}
+        else
+            idxs = [N]
+        end
+        # Extract parameters of Val-typed argument from matching methods
+        vparams = Vector{P}()
+        for m in Tricks._methods(f, T, nothing, world)
+            argtypes = fieldtypes(m.sig)[2:end]
+            all(idxs .<= length(argtypes)) || continue
+            types = argtypes[idxs]
+            all(ty <: Val && isconcretetype(ty) for ty in types) || continue
+            ps = multi_idx ? Tuple(val_param.(types)) : val_param(types[1])
+            ps isa P || continue
+            push!(vparams, ps)
+        end
+        unique!(vparams)
+        vparams = Tuple(vparams)
+        # Create CodeInfo and add edges so if a method is defined this recompiles
+        ci = Tricks.create_codeinfo_with_returnvalue(
+            [Symbol("#self#"), :f, :types, :idx, :ptype],
+            [:T, :N, :P], (:T, :N, :P), :($vparams))
+        ci.edges = Tricks._method_table_all_edges_all_methods(f, T, world)
+        return ci
     end
-    # Extract parameters of Val-typed argument from matching methods
-    vparams = Vector{P}()
-    for m in Tricks._methods(f, T)
-        argtypes = fieldtypes(m.sig)[2:end]
-        all(idxs .<= length(argtypes)) || continue
-        types = argtypes[idxs]
-        all(ty <: Val && isconcretetype(ty) for ty in types) || continue
-        ps = multi_idx ? Tuple(val_param.(types)) : val_param(types[1])
-        ps isa P || continue
-        push!(vparams, ps)
+    @eval function valarg_params(
+        @nospecialize(f) , @nospecialize(types::Type{T}),
+        @nospecialize(idx::Val{N}), @nospecialize(ptype::Type{P}=Any)
+    ) where {T <: Tuple, N, P}
+        $(Expr(:meta, :generated, _valarg_params))
+        $(Expr(:meta, :generated_only))
     end
-    unique!(vparams)
-    vparams = Tuple(vparams)
-    # Create CodeInfo and add edges so if a method is defined this recompiles
-    ci = Tricks.create_codeinfo_with_returnvalue(
-        [Symbol("#self#"), :f, :types, :idx, :ptype],
-        [:T, :N, :P], (:T, :N, :P), :($vparams))
-    ci.edges = Tricks._method_table_all_edges_all_methods(f, T)
-    return ci
+else
+    @generated function valarg_params(
+        @nospecialize(f) , @nospecialize(types::Type{T}),
+        @nospecialize(idx::Val{N}), @nospecialize(ptype::Type{P}=Any)
+    ) where {T <: Tuple, N, P}
+        # Check if N and P are single values or tuples
+        multi_idx = N isa Tuple
+        if multi_idx
+            idxs = collect(Int, N)
+            P = P <: Tuple ? P : Tuple{fill(P, length(idxs))...}
+        else
+            idxs = [N]
+        end
+        # Extract parameters of Val-typed argument from matching methods
+        vparams = Vector{P}()
+        for m in Tricks._methods(f, T)
+            argtypes = fieldtypes(m.sig)[2:end]
+            all(idxs .<= length(argtypes)) || continue
+            types = argtypes[idxs]
+            all(ty <: Val && isconcretetype(ty) for ty in types) || continue
+            ps = multi_idx ? Tuple(val_param.(types)) : val_param(types[1])
+            ps isa P || continue
+            push!(vparams, ps)
+        end
+        unique!(vparams)
+        vparams = Tuple(vparams)
+        # Create CodeInfo and add edges so if a method is defined this recompiles
+        ci = Tricks.create_codeinfo_with_returnvalue(
+            [Symbol("#self#"), :f, :types, :idx, :ptype],
+            [:T, :N, :P], (:T, :N, :P), :($vparams))
+        ci.edges = Tricks._method_table_all_edges_all_methods(f, T)
+        return ci
+    end
 end
 valarg_params(f, types::Type{<:Tuple}, idx::Union{Int,Tuple}, ptype::Type=Any) =
     valarg_params(f, types, Val(idx), ptype)
