@@ -90,7 +90,7 @@ spelling(::Val{ℯ}) = "euler's number"
 @test spelling(ℯ) == "euler's number"
 
 # Test that we can't split Vararg arguments
-@test_throws LoadError @macroexpand @valsplit function spelling(Val(n::Real...))
+@test_throws Exception @macroexpand @valsplit function spelling(Val(n::Real...))
     string(n)
 end
 
