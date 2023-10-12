@@ -207,10 +207,6 @@ Using the first form of `@valsplit`, each argument `x::T` to split on
 should be annotated as `Val(x::T)`. Alternatively, an argument index `idx` can
 be manually specified using the second form of the macro.
 
-!!! note "Documentation Issues"
-    Documenting a `@valsplit`-annotated function that splits on multiple
-    arguments will lead to errors. Consider documenting the function separately.
-
 # Example
 
 Suppose we have a function `soundof` that returns how an animal sounds:
@@ -242,6 +238,15 @@ function soundof(animal::Symbol)
     end
 end
 ```
+
+To split on multiple arguments at once, simply annotate each argument with
+`Val` and use the first form of `@valsplit`:
+
+```julia
+soundof(animal::Val{:cat}, lang::Val{:japanese}) = "nyan"
+```
+
+The resulting method will be equivalent to a nested if statement.
 """
 macro valsplit(expr)
     def = splitdef(expr)
@@ -272,6 +277,10 @@ macro valsplit(expr)
         V_typevar = gensym(:V)
         i_def[:args][idx] = Expr(:(::), argnames[idx], V_typevar)
         push!(get!(i_def, :whereparams, []), :($V_typevar <: $(QuoteNode(Val))))
+    end
+    # Add @__doc__ to first function definition
+    f_exprs[1] = quote
+        Core.@__doc__ $(f_exprs[1])
     end
     return Expr(:block, f_exprs...)
 end

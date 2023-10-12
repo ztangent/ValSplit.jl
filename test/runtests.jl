@@ -7,6 +7,7 @@ soundof(animal::Val{:dog}) = "woof"
 soundof(animal::Val{:cat}) = "nyan"
 
 # Test first version of macro
+"Returns the sound of an animal."
 @valsplit function soundof(Val(animal::Symbol))
     error("Sound not defined for animal: $animal")
 end
@@ -46,6 +47,7 @@ soundof(animal::Val{:frog}, lang::Val{:korean}) = "gaegul"
 soundof(animal::Val{:frog}, lang::Val{:hindi}) = "tarr"
 soundof(animal::Val{:frog}, lang::Val{:english}) = "ribbit"
 
+"Returns the sound of an animal in a given language."
 @valsplit function soundof(Val(animal::Symbol), Val(lang::Symbol))
     error("Sound not defined.")
 end
@@ -68,6 +70,7 @@ soundof(::Val{:dog}, ::Val{:english}) = "woof"
 
 ## Test non-symbol method signatures
 
+"Returns the spelling of a number."
 @valsplit function spelling(Val(n::T)) where {T <: Real}
     error("Unknown number.")
 end
