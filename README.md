@@ -1,6 +1,6 @@
 # ValSplit.jl
 
-![GitHub Workflow Status](https://img.shields.io/github/workflow/status/ztangent/ValSplit.jl/CI)
+![GitHub Workflow Status](https://img.shields.io/github/actions/workflow/status/ztangent/ValSplit.jl/CI.yml?branch=main)
 ![GitHub release (latest SemVer)](https://img.shields.io/github/v/release/ztangent/ValSplit.jl)
 ![GitHub](https://img.shields.io/github/license/ztangent/ValSplit.jl?color=lightgrey)
 
