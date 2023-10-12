@@ -21,12 +21,20 @@ end
 soundof(animal::Val{:human}) = "meh"
 @test soundof(:human) == "meh"
 
-# Test macro with index argument
-@valsplit 1 function soundof(animal::Symbol)
+## Test macro with index argument
+
+@valsplit 1 function colorof(fruit::Symbol)
     return "???"
 end
 
-@test soundof(:unknown) == "???"
+colorof(object::Val{:apple}) = "red"
+colorof(object::Val{:mango}) = "yellow"
+colorof(object::Val{:blueberry}) = "blue"
+
+@test colorof(:unknown) == "???"
+@test colorof(:apple) == "red"
+@test colorof(:mango) == "yellow"
+@test colorof(:blueberry) == "blue"
 
 ## Test splitting on multiple arguments
 
