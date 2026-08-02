@@ -154,3 +154,32 @@ Animals.soundof(animal::Val{:human}) = "meh"
 @test valarg_has_param(π, spelling, 1, Irrational)
 @test valarg_has_param(:japanese, soundof, Tuple{Val{:cat}, Any}, 2)
 @test valarg_has_param((:frog, :english), soundof, Tuple{Any, Any}, (1, 2))
+
+
+@valsplit function nameof(Val(animal::Symbol); age::Number=10.0)
+    error("nameof undefined for animal: $animal")
+end
+
+function nameof(animal::Val{:dog}; age::Number=5.0)
+    if age > 2.0
+        return "Dog"
+    else
+        return "Puppy"
+    end
+end
+
+function nameof(animal::Val{:cat}; age=2.0)
+    if age > 1.0
+        return "Cat"
+    else
+        return "Kitten"
+    end
+end
+
+
+@test nameof(:dog) == "Dog"
+@test nameof(:cat) == "Cat"
+@test nameof(:dog; age=1.0) == "Puppy"
+@test nameof(:cat; age=1.0) == "Kitten"
+@test_throws ErrorException nameof(:dragon, age=100.0) == "Elder Dragon"
+@test_throws ErrorException nameof(:dragon) == "Dragon"

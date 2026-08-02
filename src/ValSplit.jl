@@ -181,6 +181,21 @@ function _valsplit(def::Dict{Symbol}, idx::Int, val_idxs=[idx])
     # Generate the function body
     if haskey(def, :kwargs)
         # if the default function has kwargs then pass them on as "slurped" kw arguments
+        kwargs = []
+        for kwarg in def[:kwargs]
+            if kwarg.head === :kw
+                arg = kwarg.args[1]
+                if isa(arg,Expr) && arg.head == :(::)
+                    push!(kwargs, Expr(:kw, esc(arg.args[1]), esc(arg.args[1])))
+                elseif isa(arg,Symbol)
+                    push!(kwargs, Expr(:kw, esc(arg), esc(arg)))
+                else
+                    error("Unexpected argument structure $arg")
+                end
+            else # TODO: Support slurped args?
+                error("only named kwargs are supported")
+            end
+        end
         def[:body] = quote
             # Look up the parameters for the Val-typed argument in position idx
             vals = valarg_params($(esc(fname)), $types, $idx, $ptype)
@@ -188,7 +203,7 @@ function _valsplit(def::Dict{Symbol}, idx::Int, val_idxs=[idx])
             function default_f() $(esc(def[:body])) end
             # Generate a switch expression over the Val-type parameters
             return _valswitch(Val(vals), Val($idx), $(esc(fname)), default_f,
-                              $(map(esc, argnames)...); kwargs...)
+                              $(map(esc, argnames)...); $(kwargs...))
         end
     else
         def[:body] = quote
