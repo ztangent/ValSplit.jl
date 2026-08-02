@@ -192,8 +192,10 @@ function _valsplit(def::Dict{Symbol}, idx::Int, val_idxs=[idx])
                 else
                     error("Unexpected argument structure $arg")
                 end
-            else # TODO: Support slurped args?
-                error("only named kwargs are supported")
+            elseif kwarg.head === :(...)
+                push!(kwargs, Expr(:(...), kwarg.args[1]))
+            else
+                error("Unexpected argument structure $kwarg")
             end
         end
         def[:body] = quote
