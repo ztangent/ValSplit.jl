@@ -135,13 +135,13 @@ branch conditions. Each branch with value `v` calls `f(args...)`, with
 is called with with no arguments.
 """
 @generated function _valswitch(
-    vals::Val{Vs}, idx::Val{I}, f, default_f, args::Vararg{Any,N}
+    vals::Val{Vs}, idx::Val{I}, f, default_f, args::Vararg{Any,N}; kwargs...
 ) where {Vs, I, N}
     vals = map(QuoteNode, Vs)
     cond_exprs = [Expr(:call, :(==), :(args[$I]), v) for v in vals]
     branch_exprs = map(vals) do v
         args = [i == I ? :(Val($v)) : :(args[$i]) for i in 1:N]
-        return Expr(:call, :f, args...)
+        return Expr(:call, :f, Expr(:parameters, :(kwargs...)), args...)
     end
     default_expr = :(default_f())
     return generate_switch_stmt(cond_exprs, branch_exprs, default_expr)
@@ -177,16 +177,32 @@ function _valsplit(def::Dict{Symbol}, idx::Int, val_idxs=[idx])
     if haskey(def, :whereparams)
         def[:whereparams] = map(esc, def[:whereparams])
     end
+
     # Generate the function body
-    def[:body] = quote
-        # Look up the parameters for the Val-typed argument in position idx
-        vals = valarg_params($(esc(fname)), $types, $idx, $ptype)
-        # Default function returns the original function body
-        function default_f() $(esc(def[:body])) end
-        # Generate a switch expression over the Val-type parameters
-        return _valswitch(Val(vals), Val($idx), $(esc(fname)), default_f,
-                          $(map(esc, argnames)...))
+    if haskey(def, :kwargs)
+        # if the default function has kwargs then pass them on as "slurped" kw arguments
+        def[:body] = quote
+            # Look up the parameters for the Val-typed argument in position idx
+            vals = valarg_params($(esc(fname)), $types, $idx, $ptype)
+            # Default function returns the original function body
+            function default_f() $(esc(def[:body])) end
+            # Generate a switch expression over the Val-type parameters
+            return _valswitch(Val(vals), Val($idx), $(esc(fname)), default_f,
+                              $(map(esc, argnames)...); kwargs...)
+        end
+    else
+        def[:body] = quote
+            # Look up the parameters for the Val-typed argument in position idx
+            vals = valarg_params($(esc(fname)), $types, $idx, $ptype)
+            # Default function returns the original function body
+            function default_f() $(esc(def[:body])) end
+            # Generate a switch expression over the Val-type parameters
+            return _valswitch(Val(vals), Val($idx), $(esc(fname)), default_f,
+                              $(map(esc, argnames)...))
+        end
     end
+
+
     # Return recombined function expression
     return combinedef(def)
 end
