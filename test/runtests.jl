@@ -154,3 +154,65 @@ Animals.soundof(animal::Val{:human}) = "meh"
 @test valarg_has_param(π, spelling, 1, Irrational)
 @test valarg_has_param(:japanese, soundof, Tuple{Val{:cat}, Any}, 2)
 @test valarg_has_param((:frog, :english), soundof, Tuple{Any, Any}, (1, 2))
+
+
+@valsplit function nameof(Val(animal::Symbol); age::Number=10.0)
+    error("nameof undefined for animal: $animal")
+end
+
+function nameof(animal::Val{:dog}; age::Number=5.0)
+    if age > 2.0
+        return "Dog"
+    else
+        return "Puppy"
+    end
+end
+
+function nameof(animal::Val{:cat}; age=2.0)
+    if age > 1.0
+        return "Cat"
+    else
+        return "Kitten"
+    end
+end
+
+@test nameof(:dog) == "Dog"
+@test nameof(:cat) == "Cat"
+@test nameof(:dog; age=1.0) == "Puppy"
+@test nameof(:cat; age=1.0) == "Kitten"
+@test_throws ErrorException nameof(:dragon; age=100.0) == "Elder Dragon"
+@test_throws ErrorException nameof(:dragon) == "Dragon"
+
+
+@valsplit function groupnameof(Val(animal::Symbol); count::Integer=1, kwargs...)
+    error("groupnameof not defined for $animal")
+end
+
+function groupnameof(animal::Val{:antelope}; count::Integer=1)
+    if count == 1
+        return "Antelope"
+    else
+        return "Herd of Antelope"
+    end
+end
+
+function groupnameof(animal::Val{:finch}; count::Integer=1, age::Number=1.0)
+    if count == 1
+        return "Finch"
+    else
+        if age > 0.0
+            return "Flock of Finches"
+        else
+            return "Clutch of Finch eggs"
+        end
+    end
+end
+
+@test groupnameof(:antelope) == "Antelope"
+@test groupnameof(:antelope; count=10) == "Herd of Antelope"
+@test groupnameof(:finch; count=10, age=1.0) == "Flock of Finches"
+@test groupnameof(:finch; count=10, age=-1.0) == "Clutch of Finch eggs"
+@test_throws MethodError groupnameof(:antelope; count=10, age=1.0) == "Herd of Antelope" # will throw method error if not defined with slurped kwargs.
+@test_throws ErrorException groupnameof(:dragon; age=100.0) == "Elder Dragon"
+@test_throws ErrorException groupnameof(:dragon; count=100, age=100.0) == "Flight of Elder Dragons"
+@test_throws ErrorException groupnameof(:dragon; count=2, age=-10.0) == "Clutch of Dragon eggs"
