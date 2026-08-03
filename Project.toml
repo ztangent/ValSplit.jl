@@ -1,7 +1,7 @@
 name = "ValSplit"
 uuid = "0625e100-946b-11ec-09cd-6328dd093154"
 authors = ["Xuan <tanqazx@gmail.com> and contributors"]
-version = "0.1.1"
+version = "0.1.2"
 
 [deps]
 ExprTools = "e2ba6199-217a-4e67-a87a-7c52f15ade04"
